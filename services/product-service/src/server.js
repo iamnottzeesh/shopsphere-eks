@@ -3,14 +3,18 @@ const products = require("./products");
 
 const app = express();
 const port = process.env.PORT || 3000;
+const serviceName = process.env.SERVICE_NAME || "product-service";
+const serviceVersion = process.env.SERVICE_VERSION || "1.0.1";
+const appEnvironment = process.env.APP_ENV || "development";
+const defaultCurrency = process.env.DEFAULT_CURRENCY || "INR";
 
 app.use(express.json());
 app.use(express.static("src/public"));
 
 app.get("/", (req, res) => {
   res.status(200).json({
-    service: "product-service",
-    version: "1.0.0",
+    service: serviceName,
+    version: serviceVersion,
     status: "running"
   });
 });
@@ -18,8 +22,17 @@ app.get("/", (req, res) => {
 app.get("/health", (req, res) => {
   res.status(200).json({
     status: "healthy",
-    service: "product-service",
+    service: serviceName,
     timestamp: new Date().toISOString()
+  });
+});
+
+app.get("/config", (req, res) => {
+  res.status(200).json({
+    service: serviceName,
+    version: serviceVersion,
+    environment: appEnvironment,
+    defaultCurrency
   });
 });
 

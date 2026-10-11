@@ -22,8 +22,11 @@ spec:
     spec:
       containers:
         - name: product-service
-          image: 121973526749.dkr.ecr.ap-south-1.amazonaws.com/shopsphere-product-service:1.0.1
+          image: 121973526749.dkr.ecr.ap-south-1.amazonaws.com/shopsphere-product-service:1.0.2
           imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: product-service-config
           ports:
             - name: http
               containerPort: 3000
