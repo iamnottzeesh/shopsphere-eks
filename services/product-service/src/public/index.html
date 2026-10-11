@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta
+    name="description"
+    content="ShopSphere is a cloud-native product catalog deployed on Amazon EKS."
+  />
+  <title>ShopSphere | Product Catalog</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="ShopSphere home">
+      <span class="brand-icon">S</span>
+      <span>
+        <strong>ShopSphere</strong>
+        <small>Cloud-native storefront</small>
+      </span>
+    </a>
+
+    <div id="service-status" class="service-status" aria-live="polite">
+      <span class="status-dot"></span>
+      <span>Checking service</span>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">SHOPSPHERE CATALOG</p>
+        <h1>Better tools for<br />everyday work.</h1>
+        <p class="hero-text">
+          A cloud-native product catalog powered by Node.js, Docker,
+          Amazon ECR, Kubernetes, and Amazon EKS.
+        </p>
+        <a class="hero-button" href="#catalog">Browse products <span>→</span></a>
+      </div>
+      <div class="hero-art" aria-hidden="true">
+        <div class="orb orb-one"></div>
+        <div class="orb orb-two"></div>
+        <div class="hero-card">🛍️</div>
+      </div>
+    </section>
+
+    <section id="catalog" class="catalog-section">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow dark">PRODUCT CATALOG</p>
+          <h2>Featured products</h2>
+          <p id="product-summary">Loading products...</p>
+        </div>
+
+        <div class="filters" aria-label="Filter products by category">
+          <button class="filter active" data-category="">All</button>
+          <button class="filter" data-category="electronics">Electronics</button>
+          <button class="filter" data-category="clothing">Clothing</button>
+          <button class="filter" data-category="accessories">Accessories</button>
+        </div>
+      </div>
+
+      <div id="product-grid" class="product-grid" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <footer>
+    <p>ShopSphere · Product Catalog Microservice · Deployed on Amazon EKS</p>
+  </footer>
+
+  <script src="/app.js"></script>
+</body>
+</html>
