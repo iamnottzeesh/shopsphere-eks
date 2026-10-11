@@ -1,0 +1,13 @@
+{
+  "name": "shopsphere-product-service",
+  "version": "1.0.0",
+  "description": "Product catalog microservice for ShopSphere",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "dependencies": {
+    "express": "^5.1.0"
+  }
+}
