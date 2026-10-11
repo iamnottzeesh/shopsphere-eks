@@ -48,6 +48,10 @@ Product Service Pod        Product Service Pod
 Amazon ECR: shopsphere-product-service:1.0.0
 ```
 
+## Architecture Diagram
+
+See the detailed diagram in [docs/architecture.md](docs/architecture.md).
+
 ## Technology Stack
 
 - Node.js 22
