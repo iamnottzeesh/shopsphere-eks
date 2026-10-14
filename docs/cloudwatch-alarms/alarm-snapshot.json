@@ -1,0 +1,90 @@
+{
+    "MetricAlarms": [
+        {
+            "AlarmName": "shopsphere-product-service-high-memory",
+            "AlarmArn": "arn:aws:cloudwatch:ap-south-1:121973526749:alarm:shopsphere-product-service-high-memory",
+            "AlarmDescription": "Product Service memory utilization relative to pod limit is at least 80 percent in 3 of 5 one-minute periods.",
+            "AlarmConfigurationUpdatedTimestamp": "2026-10-14T13:40:03.916000+00:00",
+            "ActionsEnabled": true,
+            "OKActions": [
+                "arn:aws:sns:ap-south-1:121973526749:shopsphere-alerts"
+            ],
+            "AlarmActions": [
+                "arn:aws:sns:ap-south-1:121973526749:shopsphere-alerts"
+            ],
+            "InsufficientDataActions": [],
+            "StateValue": "OK",
+            "StateReason": "Threshold Crossed: 5 out of the last 5 datapoints were not greater than or equal to the threshold (80.0). The most recent datapoints which not crossed the threshold: [19.82269287109375 (14/10/26 13:40:00), 19.82269287109375 (14/10/26 13:39:00), 19.82269287109375 (14/10/26 13:38:00), 19.82269287109375 (14/10/26 13:37:00), 19.82269287109375 (14/10/26 13:36:00)] (minimum 3 datapoints for ALARM -> OK transition).",
+            "StateReasonData": "{\"version\":\"1.0\",\"queryDate\":\"2026-10-14T13:41:13.541+0000\",\"startDate\":\"2026-10-14T13:36:00.000+0000\",\"statistic\":\"Maximum\",\"period\":60,\"recentDatapoints\":[19.82269287109375,19.82269287109375,19.82269287109375,19.82269287109375,19.82269287109375],\"threshold\":80.0,\"evaluatedDatapoints\":[{\"timestamp\":\"2026-10-14T13:40:00.000+0000\",\"sampleCount\":2.0,\"value\":19.82269287109375},{\"timestamp\":\"2026-10-14T13:39:00.000+0000\",\"sampleCount\":2.0,\"value\":19.82269287109375},{\"timestamp\":\"2026-10-14T13:38:00.000+0000\",\"sampleCount\":2.0,\"value\":19.82269287109375}]}",
+            "StateUpdatedTimestamp": "2026-10-14T13:41:13.542000+00:00",
+            "MetricName": "pod_memory_utilization_over_pod_limit",
+            "Namespace": "ContainerInsights",
+            "Statistic": "Maximum",
+            "Dimensions": [
+                {
+                    "Name": "ClusterName",
+                    "Value": "shopsphere-eks"
+                },
+                {
+                    "Name": "PodName",
+                    "Value": "product-service"
+                },
+                {
+                    "Name": "Namespace",
+                    "Value": "shopsphere"
+                }
+            ],
+            "Period": 60,
+            "EvaluationPeriods": 5,
+            "DatapointsToAlarm": 3,
+            "Threshold": 80.0,
+            "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+            "TreatMissingData": "missing",
+            "StateTransitionedTimestamp": "2026-10-14T13:41:13.542000+00:00"
+        },
+        {
+            "AlarmName": "shopsphere-product-service-low-running-pods",
+            "AlarmArn": "arn:aws:cloudwatch:ap-south-1:121973526749:alarm:shopsphere-product-service-low-running-pods",
+            "AlarmDescription": "Product Service running pod count below 2 for three 60-second periods. Missing telemetry is not treated as healthy.",
+            "AlarmConfigurationUpdatedTimestamp": "2026-10-14T13:31:19.332000+00:00",
+            "ActionsEnabled": true,
+            "OKActions": [
+                "arn:aws:sns:ap-south-1:121973526749:shopsphere-alerts"
+            ],
+            "AlarmActions": [
+                "arn:aws:sns:ap-south-1:121973526749:shopsphere-alerts"
+            ],
+            "InsufficientDataActions": [],
+            "StateValue": "OK",
+            "StateReason": "Threshold Crossed: 3 out of the last 3 datapoints [2.0 (14/10/26 13:33:00), 2.0 (14/10/26 13:32:00), 2.0 (14/10/26 13:31:00)] were not less than the threshold (2.0) (minimum 1 datapoint for ALARM -> OK transition).",
+            "StateReasonData": "{\"version\":\"1.0\",\"queryDate\":\"2026-10-14T13:34:34.809+0000\",\"startDate\":\"2026-10-14T13:31:00.000+0000\",\"statistic\":\"Minimum\",\"period\":60,\"recentDatapoints\":[2.0,2.0,2.0],\"threshold\":2.0,\"evaluatedDatapoints\":[{\"timestamp\":\"2026-10-14T13:33:00.000+0000\",\"sampleCount\":1.0,\"value\":2.0}]}",
+            "StateUpdatedTimestamp": "2026-10-14T13:34:34.812000+00:00",
+            "MetricName": "service_number_of_running_pods",
+            "Namespace": "ContainerInsights",
+            "Statistic": "Minimum",
+            "Dimensions": [
+                {
+                    "Name": "ClusterName",
+                    "Value": "shopsphere-eks"
+                },
+                {
+                    "Name": "Service",
+                    "Value": "product-service"
+                },
+                {
+                    "Name": "Namespace",
+                    "Value": "shopsphere"
+                }
+            ],
+            "Period": 60,
+            "EvaluationPeriods": 3,
+            "DatapointsToAlarm": 3,
+            "Threshold": 2.0,
+            "ComparisonOperator": "LessThanThreshold",
+            "TreatMissingData": "missing",
+            "StateTransitionedTimestamp": "2026-10-14T13:34:34.812000+00:00"
+        }
+    ],
+    "CompositeAlarms": [],
+    "LogAlarms": []
+}
