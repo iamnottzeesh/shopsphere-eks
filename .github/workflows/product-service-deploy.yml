@@ -1,0 +1,201 @@
+name: ShopSphere Product Service Build and Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: "Deploy the new image to shopsphere/product-service"
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: shopsphere-product-service-release
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ap-south-1
+  ECR_REGISTRY: 121973526749.dkr.ecr.ap-south-1.amazonaws.com
+  ECR_REPOSITORY: shopsphere-product-service
+  EKS_CLUSTER_NAME: shopsphere-eks
+  K8S_NAMESPACE: shopsphere
+  K8S_DEPLOYMENT: product-service
+  K8S_CONTAINER: product-service
+
+jobs:
+  build-and-deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Define unique image tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="sha-${GITHUB_SHA:0:12}-run-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY:$TAG"
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+          echo "Image: $IMAGE"
+
+      - name: Build product-service image
+        run: |
+          docker build \
+            --tag "$IMAGE" \
+            --file services/product-service/Dockerfile \
+            services/product-service
+
+      - name: Smoke test container health
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          docker run --detach \
+            --name product-service-smoke \
+            "$IMAGE"
+
+          trap 'docker logs product-service-smoke || true; docker rm --force product-service-smoke || true' EXIT
+
+          healthy=false
+          for attempt in $(seq 1 30); do
+            if docker exec product-service-smoke node -e '
+              fetch("http://127.0.0.1:3000/health")
+                .then(async response => {
+                  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                  const body = await response.json();
+                  if (body.status !== "healthy") throw new Error("Unhealthy response");
+                  console.log(JSON.stringify(body));
+                })
+                .catch(error => {
+                  console.error(error.message);
+                  process.exit(1);
+                });
+            '; then
+              healthy=true
+              break
+            fi
+            sleep 2
+          done
+
+          if [ "$healthy" != true ]; then
+            echo "Container health check failed."
+            exit 1
+          fi
+
+      - name: Authenticate to AWS using OIDC
+        uses: aws-actions/configure-aws-credentials@v6.3.0
+        with:
+          role-to-assume: arn:aws:iam::121973526749:role/shopsphere-github-actions-role
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: shopsphere-product-service-release
+          retry-max-attempts: 2
+
+      - name: Log in to Amazon ECR
+        shell: bash
+        run: |
+          set -euo pipefail
+          aws ecr get-login-password --region "$AWS_REGION" \
+            | docker login \
+                --username AWS \
+                --password-stdin "$ECR_REGISTRY"
+
+      - name: Push image and capture digest
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker push "$IMAGE"
+
+          IMAGE_DIGEST="$(docker image inspect "$IMAGE" \
+            --format '{{index .RepoDigests 0}}')"
+
+          if [[ "$IMAGE_DIGEST" != "$ECR_REGISTRY/$ECR_REPOSITORY@sha256:"* ]]; then
+            echo "Unexpected image digest: $IMAGE_DIGEST"
+            exit 1
+          fi
+
+          echo "IMAGE_DIGEST=$IMAGE_DIGEST" >> "$GITHUB_ENV"
+
+          {
+            echo "## Product-service image"
+            echo "- Tag: \`$IMAGE\`"
+            echo "- Digest: \`$IMAGE_DIGEST\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Install cluster-compatible kubectl
+        if: ${{ inputs.deploy }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          CLUSTER_VERSION="$(aws eks describe-cluster \
+            --name "$EKS_CLUSTER_NAME" \
+            --region "$AWS_REGION" \
+            --query 'cluster.version' \
+            --output text \
+            --no-cli-pager)"
+
+          KUBECTL_VERSION="$(curl --fail --silent --show-error --location \
+            "https://dl.k8s.io/release/stable-${CLUSTER_VERSION}.txt")"
+
+          DOWNLOAD_DIR="$(mktemp -d)"
+          cd "$DOWNLOAD_DIR"
+
+          curl --fail --silent --show-error --location \
+            --output kubectl \
+            "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+
+          curl --fail --silent --show-error --location \
+            --output kubectl.sha256 \
+            "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl.sha256"
+
+          echo "$(cat kubectl.sha256)  kubectl" | sha256sum --check
+          sudo install -m 0755 kubectl /usr/local/bin/kubectl
+
+      - name: Configure kubeconfig
+        if: ${{ inputs.deploy }}
+        run: |
+          aws eks update-kubeconfig \
+            --name "$EKS_CLUSTER_NAME" \
+            --region "$AWS_REGION" \
+            --alias shopsphere-ci
+
+      - name: Record previous image
+        if: ${{ inputs.deploy }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          PREVIOUS_IMAGE="$(kubectl get deployment "$K8S_DEPLOYMENT" \
+            --namespace "$K8S_NAMESPACE" \
+            -o jsonpath='{.spec.template.spec.containers[?(@.name=="product-service")].image}')"
+
+          test -n "$PREVIOUS_IMAGE"
+
+          echo "Previous image: $PREVIOUS_IMAGE"
+          echo "- Previous image: \`$PREVIOUS_IMAGE\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Deploy image by digest and wait for rollout
+        if: ${{ inputs.deploy }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          kubectl set image "deployment/$K8S_DEPLOYMENT" \
+            "$K8S_CONTAINER=$IMAGE_DIGEST" \
+            --namespace "$K8S_NAMESPACE"
+
+          kubectl rollout status "deployment/$K8S_DEPLOYMENT" \
+            --namespace "$K8S_NAMESPACE" \
+            --timeout=300s
+
+          kubectl get deployment "$K8S_DEPLOYMENT" \
+            --namespace "$K8S_NAMESPACE" \
+            -o wide
+
+          echo "- Rollout: completed" >> "$GITHUB_STEP_SUMMARY"
