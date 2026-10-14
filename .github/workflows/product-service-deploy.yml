@@ -1,81 +1,139 @@
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: shopsphere
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: product-service
-  namespace: shopsphere
-  labels:
-    app: product-service
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: product-service
-  template:
-    metadata:
-      labels:
-        app: product-service
-      annotations:
-        cloudwatch.aws.amazon.com/auto-annotate-dotnet: "false"
-        cloudwatch.aws.amazon.com/auto-annotate-java: "false"
-        cloudwatch.aws.amazon.com/auto-annotate-nodejs: "false"
-        cloudwatch.aws.amazon.com/auto-annotate-python: "false"
-        instrumentation.opentelemetry.io/inject-dotnet: "false"
-        instrumentation.opentelemetry.io/inject-java: "false"
-        instrumentation.opentelemetry.io/inject-nodejs: "false"
-        instrumentation.opentelemetry.io/inject-python: "false"
-    spec:
-      containers:
-        - name: product-service
-          image: 121973526749.dkr.ecr.ap-south-1.amazonaws.com/shopsphere-product-service@sha256:df7d9f0ebc78b19dea50b5458aaabd03ea3fecc028d63baa40e04b3c50b41782
-          imagePullPolicy: IfNotPresent
-          envFrom:
-            - configMapRef:
-                name: product-service-config
-          ports:
-            - name: http
-              containerPort: 3000
-          resources:
-            requests:
-              cpu: 100m
-              memory: 128Mi
-            limits:
-              cpu: 250m
-              memory: 256Mi
-          readinessProbe:
-            httpGet:
-              path: /health
-              port: http
-            initialDelaySeconds: 5
-            periodSeconds: 10
-            timeoutSeconds: 3
-            failureThreshold: 3
-          livenessProbe:
-            httpGet:
-              path: /health
-              port: http
-            initialDelaySeconds: 15
-            periodSeconds: 20
-            timeoutSeconds: 3
-            failureThreshold: 3
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: product-service
-  namespace: shopsphere
-  labels:
-    app: product-service
-spec:
-  type: LoadBalancer
-  selector:
-    app: product-service
-  ports:
-    - name: http
-      protocol: TCP
-      port: 80
-      targetPort: http
+name: ShopSphere Product Service Build and Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: "Deploy the new image to shopsphere/product-service"
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: shopsphere-product-service-release
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ap-south-1
+  ECR_REGISTRY: 121973526749.dkr.ecr.ap-south-1.amazonaws.com
+  ECR_REPOSITORY: shopsphere-product-service
+  EKS_CLUSTER_NAME: shopsphere-eks
+  K8S_NAMESPACE: shopsphere
+  K8S_DEPLOYMENT: product-service
+  K8S_CONTAINER: product-service
+
+jobs:
+  build-and-deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Define unique image tag
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TAG="sha-${GITHUB_SHA:0:12}-run-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY:$TAG"
+
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+          echo "Image: $IMAGE"
+
+      - name: Build product-service image
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          docker build \
+            --tag "$IMAGE" \
+            --file services/product-service/Dockerfile \
+            services/product-service
+
+      - name: Smoke test container health
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          docker run --detach \
+            --name product-service-smoke \
+            "$IMAGE"
+
+          trap 'docker logs product-service-smoke || true; docker rm --force product-service-smoke || true' EXIT
+
+          healthy=false
+
+          for attempt in $(seq 1 30); do
+            if docker exec product-service-smoke node -e '
+              fetch("http://127.0.0.1:3000/health")
+                .then(async response => {
+                  if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                  }
+
+                  const body = await response.json();
+
+                  if (body.status !== "healthy") {
+                    throw new Error("Unhealthy response");
+                  }
+
+                  console.log(JSON.stringify(body));
+                })
+                .catch(error => {
+                  console.error(error.message);
+                  process.exit(1);
+                });
+            '; then
+              healthy=true
+              break
+            fi
+
+            sleep 2
+          done
+
+          if [ "$healthy" != true ]; then
+            echo "Container health check failed."
+            exit 1
+          fi
+
+      - name: Authenticate to AWS using OIDC
+        uses: aws-actions/configure-aws-credentials@v6.3.0
+        with:
+          role-to-assume: arn:aws:iam::121973526749:role/shopsphere-github-actions-role
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: shopsphere-product-service-release
+          retry-max-attempts: 2
+
+      - name: Log in to Amazon ECR
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          aws ecr get-login-password --region "$AWS_REGION" \
+            | docker login \
+                --username AWS \
+                --password-stdin "$ECR_REGISTRY"
+
+      - name: Push image and capture digest
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          docker push "$IMAGE"
+
+          IMAGE_DIGEST="$(docker image inspect "$IMAGE" \
+            --format '{{index .RepoDigests 0}}')"
+
+          if [[ "$IMAGE_DIGEST" != "$ECR_REGISTRY/$ECR_REPOSITORY@sha256:"* ]]; then
+            echo "Unexpected image digest: $IMAGE_DIGEST"
+            exit 1
+          fi
+
+          echo "IMAGE_DIGEST=$IMAGE_DIGEST"
