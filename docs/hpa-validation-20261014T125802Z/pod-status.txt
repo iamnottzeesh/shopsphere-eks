@@ -1,0 +1,3 @@
+NAME                               READY   STATUS    RESTARTS   AGE
+product-service-85fbd646cd-2ftt8   1/1     Running   0          3d6h
+product-service-85fbd646cd-89n7q   1/1     Running   0          3d6h
