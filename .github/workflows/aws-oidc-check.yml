@@ -7,39 +7,33 @@ permissions:
   contents: read
   id-token: write
 
+env:
+  AWS_REGION: ap-south-1
+  EKS_CLUSTER_NAME: shopsphere-eks
+
 jobs:
   verify-aws:
     if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
 
     steps:
-      - name: Inspect OIDC claims safely
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const token = await core.getIDToken('sts.amazonaws.com');
-            const claims = JSON.parse(
-              Buffer.from(token.split('.')[1], 'base64url').toString('utf8')
-            );
-
-            core.info(JSON.stringify({
-              sub: claims.sub,
-              aud: claims.aud,
-              iss: claims.iss,
-              repository: claims.repository,
-              repository_id: claims.repository_id,
-              repository_owner_id: claims.repository_owner_id,
-              ref: claims.ref
-            }, null, 2));
-
       - name: Authenticate to AWS using OIDC
         uses: aws-actions/configure-aws-credentials@v6.3.0
         with:
           role-to-assume: arn:aws:iam::121973526749:role/shopsphere-github-actions-role
-          aws-region: ap-south-1
+          aws-region: ${{ env.AWS_REGION }}
           role-session-name: shopsphere-oidc-check
           retry-max-attempts: 2
 
       - name: Verify AWS identity
-        run: aws sts get-caller-identity
+        run: aws sts get-caller-identity --no-cli-pager
+
+      - name: Verify EKS describe permission
+        run: |
+          aws eks describe-cluster \
+            --name "$EKS_CLUSTER_NAME" \
+            --region "$AWS_REGION" \
+            --query 'cluster.{Name:name,Status:status,Version:version,Arn:arn}' \
+            --output json \
+            --no-cli-pager
