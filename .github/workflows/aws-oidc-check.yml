@@ -10,6 +10,8 @@ permissions:
 env:
   AWS_REGION: ap-south-1
   EKS_CLUSTER_NAME: shopsphere-eks
+  K8S_NAMESPACE: shopsphere
+  K8S_DEPLOYMENT: product-service
 
 jobs:
   verify-aws:
@@ -37,3 +39,70 @@ jobs:
             --query 'cluster.{Name:name,Status:status,Version:version,Arn:arn}' \
             --output json \
             --no-cli-pager
+
+      - name: Install cluster-compatible kubectl
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          CLUSTER_VERSION="$(aws eks describe-cluster \
+            --name "$EKS_CLUSTER_NAME" \
+            --region "$AWS_REGION" \
+            --query 'cluster.version' \
+            --output text \
+            --no-cli-pager)"
+
+          KUBECTL_VERSION="$(curl --fail --silent --show-error --location \
+            "https://dl.k8s.io/release/stable-${CLUSTER_VERSION}.txt")"
+
+          DOWNLOAD_DIR="$(mktemp -d)"
+          cd "$DOWNLOAD_DIR"
+
+          curl --fail --silent --show-error --location \
+            --output kubectl \
+            "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+
+          curl --fail --silent --show-error --location \
+            --output kubectl.sha256 \
+            "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl.sha256"
+
+          echo "$(cat kubectl.sha256)  kubectl" | sha256sum --check
+          sudo install -m 0755 kubectl /usr/local/bin/kubectl
+
+          kubectl version --client
+
+      - name: Configure kubeconfig for GitHub role
+        run: |
+          aws eks update-kubeconfig \
+            --name "$EKS_CLUSTER_NAME" \
+            --region "$AWS_REGION" \
+            --alias shopsphere-ci
+
+      - name: Verify Kubernetes permissions without deploying
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          kubectl auth can-i get \
+            "deployments.apps/$K8S_DEPLOYMENT" \
+            --namespace "$K8S_NAMESPACE"
+
+          kubectl auth can-i patch \
+            "deployments.apps/$K8S_DEPLOYMENT" \
+            --namespace "$K8S_NAMESPACE"
+
+          kubectl auth can-i list deployments.apps \
+            --namespace "$K8S_NAMESPACE"
+
+          kubectl auth can-i watch deployments.apps \
+            --namespace "$K8S_NAMESPACE"
+
+          kubectl auth can-i list pods \
+            --namespace "$K8S_NAMESPACE"
+
+      - name: Read existing product-service deployment
+        run: |
+          kubectl get deployment "$K8S_DEPLOYMENT" \
+            --namespace "$K8S_NAMESPACE" \
+            --request-timeout=30s \
+            -o wide
