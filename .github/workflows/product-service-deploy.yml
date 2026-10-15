@@ -281,3 +281,48 @@ jobs:
             --request-timeout=20s
 
           echo "- Recovery: previous image restored and rollout completed" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Verify external product-service endpoints
+        if: ${{ success() && inputs.deploy }}
+        timeout-minutes: 4
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          LB_HOST="$(kubectl get service product-service \
+            -n "$K8S_NAMESPACE" --request-timeout=20s \
+            -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')"
+
+          test -n "$LB_HOST"
+          BASE_URL="http://$LB_HOST"
+          verified=false
+          CHECK_DIR="$(mktemp -d)"
+          trap 'rm -rf "$CHECK_DIR"' EXIT
+
+          for attempt in $(seq 1 6); do
+            echo "Endpoint verification attempt $attempt/6"
+
+            if curl --fail --silent --show-error \
+                 --connect-timeout 5 --max-time 10 \
+                 "$BASE_URL/health" -o "$CHECK_DIR/health.json" \
+              && jq -e 'type == "object" and .status == "healthy" and .service == "shopsphere-product-service"' \
+                 "$CHECK_DIR/health.json" \
+              && curl --fail --silent --show-error \
+                 --connect-timeout 5 --max-time 10 \
+                 "$BASE_URL/products" -o "$CHECK_DIR/products.json" \
+              && jq -e 'type == "object" and (.products | type == "array") and (.count | type == "number") and .count == (.products | length)' \
+                 "$CHECK_DIR/products.json"; then
+              verified=true
+              break
+            fi
+
+            sleep 5
+          done
+
+          if [ "$verified" != true ]; then
+            echo "::error::External endpoint verification failed."
+            echo "- External checks: FAILED" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          echo "- External checks: health and products passed" >> "$GITHUB_STEP_SUMMARY"
