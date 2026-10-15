@@ -48,3 +48,18 @@ Duration is server-side response timing, not client latency.
 The finish listener does not capture every aborted request.
 Health-check requests are also logged.
 Raw validation output is not included in this document.
+
+## Automated regression validation
+
+Validated in GitHub Actions on 2026-10-15.
+Workflow run: 38740121426.
+The build-and-deploy job succeeded.
+npm test reported 1 passed, 0 failed.
+
+Test file: services/product-service/test/request-logging.test.js
+Command from services/product-service: npm test
+
+The test checks health/catalog/404 responses, request-ID correlation,
+route templates, non-negative duration, and test query-value exclusion.
+The release workflow runs it before the Docker build.
+This is a regression test, not a load or full security test.

@@ -166,6 +166,8 @@ Ensure the manifest image is the intended release before reapplying it.
 
 ## Implemented Platform Features
 
+- Automated HTTP logging regression test, validated locally and in CI.
+
 - Static product storefront and catalog API.
 - Runtime configuration through a Kubernetes ConfigMap.
 - CPU-based HPA: minimum 2, maximum 10, target 70%.
@@ -193,7 +195,6 @@ Ensure the manifest image is the intended release before reapplying it.
 - AWS Secrets Manager integration.
 - Cart, order, and authentication services.
 - Database integration.
-- Committed automated request-logging regression tests.
 - GitHub Actions checkout runtime-warning maintenance.
 
 Validation limitations are documented in the linked evidence.
