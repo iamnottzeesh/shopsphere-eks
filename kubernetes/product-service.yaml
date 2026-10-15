@@ -19,10 +19,19 @@ spec:
     metadata:
       labels:
         app: product-service
+      annotations:
+        cloudwatch.aws.amazon.com/auto-annotate-dotnet: "false"
+        cloudwatch.aws.amazon.com/auto-annotate-java: "false"
+        cloudwatch.aws.amazon.com/auto-annotate-nodejs: "false"
+        cloudwatch.aws.amazon.com/auto-annotate-python: "false"
+        instrumentation.opentelemetry.io/inject-dotnet: "false"
+        instrumentation.opentelemetry.io/inject-java: "false"
+        instrumentation.opentelemetry.io/inject-nodejs: "false"
+        instrumentation.opentelemetry.io/inject-python: "false"
     spec:
       containers:
         - name: product-service
-          image: 121973526749.dkr.ecr.ap-south-1.amazonaws.com/shopsphere-product-service:1.0.2
+          image: 121973526749.dkr.ecr.ap-south-1.amazonaws.com/shopsphere-product-service@sha256:df7d9f0ebc78b19dea50b5458aaabd03ea3fecc028d63baa40e04b3c50b41782
           imagePullPolicy: IfNotPresent
           envFrom:
             - configMapRef:
