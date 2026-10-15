@@ -63,3 +63,16 @@ The test checks health/catalog/404 responses, request-ID correlation,
 route templates, non-negative duration, and test query-value exclusion.
 The release workflow runs it before the Docker build.
 This is a regression test, not a load or full security test.
+
+## Release workflow action-runtime maintenance
+
+Validated: 2026-10-15.
+Commit: 97a6f06. Workflow run: 38741123935.
+Checkout and setup-node references were updated to v5.
+Application test runtime remains Node.js 22; package-manager caching is disabled.
+
+The build-only run succeeded and the regression test passed.
+The shared run summary listed no Node.js 20 warning.
+The release-recording job was skipped in this build-only validation;
+its updated checkout remains to be exercised on the next actual release.
+The separate AWS OIDC-check workflow was not changed.
