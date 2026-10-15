@@ -8,6 +8,32 @@ const serviceVersion = process.env.SERVICE_VERSION || "1.0.1";
 const appEnvironment = process.env.APP_ENV || "development";
 const defaultCurrency = process.env.DEFAULT_CURRENCY || "INR";
 
+// Structured HTTP request logging.
+app.use((req, res, next) => {
+  const requestId = require("node:crypto").randomUUID();
+  const startedAt = process.hrtime.bigint();
+
+  res.setHeader("X-Request-ID", requestId);
+
+  res.on("finish", () => {
+    const durationMs = Number(process.hrtime.bigint() - startedAt) / 1e6;
+
+    console.log(JSON.stringify({
+      timestamp: new Date().toISOString(),
+      event: "http_request",
+      service: serviceName,
+      version: serviceVersion,
+      requestId,
+      method: req.method,
+      route: req.route ? req.route.path : "static_or_unmatched",
+      statusCode: res.statusCode,
+      durationMs: Number(durationMs.toFixed(3))
+    }));
+  });
+
+  next();
+});
+
 app.use(express.json());
 app.use(express.static("src/public"));
 
