@@ -31,6 +31,8 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    outputs:
+      image_digest: ${{ steps.image.outputs.image_digest }}
 
     steps:
       - name: Checkout source
@@ -122,6 +124,7 @@ jobs:
                 --password-stdin "$ECR_REGISTRY"
 
       - name: Push image and capture digest
+        id: image
         shell: bash
         run: |
           set -euo pipefail
@@ -137,6 +140,7 @@ jobs:
           fi
 
           echo "IMAGE_DIGEST=$IMAGE_DIGEST" >> "$GITHUB_ENV"
+          echo "image_digest=$IMAGE_DIGEST" >> "$GITHUB_OUTPUT"
 
           {
             echo "## Product-service image"
@@ -326,3 +330,102 @@ jobs:
           fi
 
           echo "- External checks: health and products passed" >> "$GITHUB_STEP_SUMMARY"
+
+  record-release:
+    name: Record verified release in Git
+    needs: build-and-deploy
+    if: ${{ success() && inputs.deploy && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      RELEASE_IMAGE: ${{ needs.build-and-deploy.outputs.image_digest }}
+
+    steps:
+      - name: Checkout main for release recording
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Update manifest to verified release digest
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          image = os.environ["RELEASE_IMAGE"]
+          prefix = (
+              os.environ["ECR_REGISTRY"] + "/"
+              + os.environ["ECR_REPOSITORY"] + "@sha256:"
+          )
+
+          if not re.fullmatch(re.escape(prefix) + r"[0-9a-f]{64}", image):
+              raise SystemExit("STOP: invalid release image reference.")
+
+          path = Path("kubernetes/product-service.yaml")
+          text = path.read_text()
+          pattern = (
+              r"(?m)^([ \t]*image:[ \t]*)"
+              + re.escape(prefix)
+              + r"[0-9a-f]{64}([ \t]*)$"
+          )
+
+          updated, count = re.subn(
+              pattern,
+              lambda m: m.group(1) + image + m.group(2),
+              text,
+          )
+
+          if count != 1:
+              raise SystemExit("STOP: expected exactly one product image line.")
+
+          path.write_text(updated)
+          PY
+
+          git diff --check
+          git diff -- kubernetes/product-service.yaml
+
+      - name: Open release-recording pull request
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          if git diff --quiet -- kubernetes/product-service.yaml; then
+            echo "- Release recording: manifest already matches" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          BRANCH="release/product-service-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+
+          git switch -c "$BRANCH"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add -- kubernetes/product-service.yaml
+          git commit -m "chore: record verified product-service release"
+          git push origin "HEAD:refs/heads/$BRANCH"
+
+          RUN_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+
+          BODY="$(printf '%s\n\n%s\n\n%s\n\n%s' \
+            'Records the image from a successful deployment and external endpoint check.' \
+            "Image: $RELEASE_IMAGE" \
+            "Workflow run: $RUN_URL" \
+            'Post-deployment snapshot only. Verify against the current live image before merging; a newer release may supersede this PR.')"
+
+          PR_URL="$(gh pr create \
+            --repo "$GITHUB_REPOSITORY" \
+            --base main \
+            --head "$BRANCH" \
+            --title "chore: record product-service release $GITHUB_RUN_ID" \
+            --body "$BODY")"
+
+          echo "- Release-recording PR: $PR_URL" >> "$GITHUB_STEP_SUMMARY"
