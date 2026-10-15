@@ -1,61 +1,57 @@
 # ShopSphere Architecture
 
+Current application scope: product-service catalog API and static storefront.
+Region: ap-south-1. Cluster: shopsphere-eks. Namespace: shopsphere.
+
+This is a logical diagram, not an exact Availability Zone placement map.
+The AWS load balancer subtype is not asserted here.
+
 ```mermaid
 flowchart TB
-    User[User / Browser]
-
-    subgraph AWS["AWS Account - ap-south-1 (Mumbai)"]
-        subgraph VPC["Amazon VPC"]
-            NLB[AWS Network Load Balancer<br/>Public endpoint]
-
-            subgraph EKS["Amazon EKS: shopsphere-eks"]
-                SVC[Kubernetes Service<br/>product-service<br/>Port 80]
-                DEPLOY[Deployment: product-service<br/>Replicas: 2]
-
-                subgraph AZA["Availability Zone: ap-south-1a"]
-                    POD1[Product Service Pod 1<br/>Node.js + Express<br/>Port 3000]
-                end
-
-                subgraph AZB["Availability Zone: ap-south-1b"]
-                    POD2[Product Service Pod 2<br/>Node.js + Express<br/>Port 3000]
-                end
-            end
-
-            ECR[Amazon ECR<br/>shopsphere-product-service:1.0.0]
-        end
-
-        EC2[EC2 Development Workstation<br/>Docker, AWS CLI, kubectl, eksctl]
-    end
-
-    GITHUB[GitHub Repository<br/>iamnottzeesh/shopsphere-eks]
-
-    User -->|HTTP :80| NLB
-    NLB --> SVC
-    SVC --> DEPLOY
-    DEPLOY --> POD1
-    DEPLOY --> POD2
-    ECR -. Pull image .-> POD1
-    ECR -. Pull image .-> POD2
-    EC2 -->|Build and push image| ECR
-    EC2 -->|kubectl deploy| EKS
-    EC2 -->|git push| GITHUB
-
-    classDef aws fill:#fff3e0,stroke:#ff9900,color:#232f3e,stroke-width:2px;
-    classDef k8s fill:#e8f3ff,stroke:#326ce5,color:#102a43,stroke-width:2px;
-    classDef app fill:#f1eaff,stroke:#7048e8,color:#2d1b69,stroke-width:2px;
-    classDef external fill:#eafaf1,stroke:#2e8b57,color:#123524,stroke-width:2px;
-
-    class NLB,ECR,EC2 aws;
-    class SVC,DEPLOY k8s;
-    class POD1,POD2 app;
-    class User,GITHUB external;
+    Client[Browser or API client] --> LB[Public AWS load balancer - HTTP]
+    LB --> Service[Kubernetes LoadBalancer Service - port 80]
+    Service --> Pods[Product-service pods - port 3000]
+    Config[ConfigMap] --> Pods
+    Metrics[Kubernetes resource metrics] --> HPA[HPA - CPU target 70%]
+    HPA --> Deployment[Deployment - replicas 2 to 10]
+    Deployment --> Pods
+    GitHub[GitHub main] --> Actions[Manual GitHub Actions release]
+    Actions --> OIDC[AWS IAM role via OIDC]
+    Actions --> ECR[ECR - unique tags and image digests]
+    Actions -->|deploy=true| Deployment
+    ECR -. Image pull .-> Pods
+    Actions -->|After rollout and external checks| PR[Release-recording PR]
+    PR -->|Review and merge| GitHub
+    Pods --> FluentBit[Fluent Bit - application stdout]
+    FluentBit --> Logs[CloudWatch Logs]
+    Agent[CloudWatch agent] --> Insights[Container Insights metrics]
+    Insights --> Alarms[CloudWatch alarms]
+    Alarms --> SNS[SNS notifications]
+    Insights --> Dashboard[Product-service dashboard]
+    Alarms --> Dashboard
 ```
 
-## Request Flow
+## Request and logging flow
 
-1. A user opens the public load balancer DNS in a browser.
-2. The AWS Network Load Balancer receives the HTTP request on port 80.
-3. The Kubernetes `product-service` Service routes the request to a healthy pod.
-4. One of two Node.js/Express Product Service pods responds on port 3000.
-5. Both pods pull the container image from the private Amazon ECR repository.
-6. The EC2 development workstation builds images, pushes them to ECR, deploys Kubernetes manifests, and pushes source code to GitHub.
+The public Service routes requests to ready backend pods.
+Completed responses include X-Request-ID and emit structured JSON logs.
+Fluent Bit forwards application logs to CloudWatch.
+A public GET /products request was correlated with its CloudWatch event.
+
+## Release flow
+
+The manual workflow builds, smoke-tests, and publishes an image to ECR.
+With deploy=true, it deploys by digest and verifies public endpoints.
+A separate job opens a PR recording the verified image digest.
+Compare the PR with the live Deployment before merging.
+Push alone does not trigger the workflow.
+Recovery handles rollout failure, not external endpoint-check failure.
+
+## Scaling and limitations
+
+HPA uses Kubernetes resource metrics, not CloudWatch, to scale pods.
+The documented scaling cycle was 2 -> 3 -> 2.
+Running-pod metrics do not guarantee HTTP availability.
+The current public endpoint uses HTTP.
+HTTPS, database integration, and additional services remain future scope.
+See the validation documents linked from the main README.
