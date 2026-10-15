@@ -178,6 +178,8 @@ Ensure the manifest image is the intended release before reapplying it.
 
 ## Validation Evidence
 
+- [CloudWatch log retention: 30 days](monitoring/cloudwatch/log-retention.md).
+
 - [Architecture](docs/architecture.md)
 - [HPA scaling validation](docs/hpa-validation-20261014T125802Z/README.md)
 - [HPA evidence limitations](docs/hpa-validation-20261014T125917Z/README.md)
@@ -191,7 +193,6 @@ Ensure the manifest image is the intended release before reapplying it.
 - AWS Secrets Manager integration.
 - Cart, order, and authentication services.
 - Database integration.
-- Finite CloudWatch log retention policy.
 - Committed automated request-logging regression tests.
 - GitHub Actions checkout runtime-warning maintenance.
 
