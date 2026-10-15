@@ -199,10 +199,12 @@ jobs:
 
           test -n "$PREVIOUS_IMAGE"
 
+          echo "PREVIOUS_IMAGE=$PREVIOUS_IMAGE" >> "$GITHUB_ENV"
           echo "Previous image: $PREVIOUS_IMAGE"
           echo "- Previous image: \`$PREVIOUS_IMAGE\`" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Deploy image by digest and wait for rollout
+        id: deploy
         if: ${{ inputs.deploy }}
         shell: bash
         run: |
@@ -221,3 +223,61 @@ jobs:
             -o wide
 
           echo "- Rollout: completed" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Collect rollout failure diagnostics
+        if: ${{ failure() && inputs.deploy && steps.deploy.outcome == 'failure' }}
+        timeout-minutes: 2
+        shell: bash
+        run: |
+          set -uo pipefail
+
+          kubectl get deployment "$K8S_DEPLOYMENT" \
+            -n "$K8S_NAMESPACE" -o wide \
+            --request-timeout=20s || true
+
+          kubectl describe deployment "$K8S_DEPLOYMENT" \
+            -n "$K8S_NAMESPACE" \
+            --request-timeout=20s || true
+
+          kubectl get pods -n "$K8S_NAMESPACE" \
+            -l app=product-service -o wide \
+            --request-timeout=20s || true
+
+          kubectl get events -n "$K8S_NAMESPACE" \
+            --sort-by=.metadata.creationTimestamp \
+            --request-timeout=20s | tail -n 50 || true
+
+      - name: Restore previous image after rollout failure
+        if: ${{ failure() && inputs.deploy && steps.deploy.outcome == 'failure' }}
+        timeout-minutes: 7
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          : "${PREVIOUS_IMAGE:?Previous image was not recorded}"
+          : "${IMAGE_DIGEST:?Release image was not recorded}"
+
+          CURRENT_IMAGE="$(kubectl get deployment "$K8S_DEPLOYMENT" \
+            -n "$K8S_NAMESPACE" --request-timeout=20s \
+            -o jsonpath='{.spec.template.spec.containers[?(@.name=="product-service")].image}')"
+
+          if [ "$CURRENT_IMAGE" = "$PREVIOUS_IMAGE" ]; then
+            echo "- Recovery: previous image already configured; no change made" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          if [ "$CURRENT_IMAGE" != "$IMAGE_DIGEST" ]; then
+            echo "::error::Live image differs from this release; refusing overwrite."
+            echo "- Recovery: refused because live image changed" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          kubectl set image "deployment/$K8S_DEPLOYMENT" \
+            "$K8S_CONTAINER=$PREVIOUS_IMAGE" \
+            -n "$K8S_NAMESPACE" --request-timeout=20s
+
+          kubectl rollout status "deployment/$K8S_DEPLOYMENT" \
+            -n "$K8S_NAMESPACE" --timeout=300s \
+            --request-timeout=20s
+
+          echo "- Recovery: previous image restored and rollout completed" >> "$GITHUB_STEP_SUMMARY"
