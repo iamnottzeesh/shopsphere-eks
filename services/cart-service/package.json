@@ -1,0 +1,17 @@
+{
+  "name": "shopsphere-cart-service",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ShopSphere demo cart service",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test test/*.test.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "express": "5.1.0"
+  }
+}
