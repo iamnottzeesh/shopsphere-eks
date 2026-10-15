@@ -136,4 +136,88 @@ jobs:
             exit 1
           fi
 
-          echo "IMAGE_DIGEST=$IMAGE_DIGEST"
+          echo "IMAGE_DIGEST=$IMAGE_DIGEST" >> "$GITHUB_ENV"
+
+          {
+            echo "## Product-service image"
+            echo "- Tag: \`$IMAGE\`"
+            echo "- Digest: \`$IMAGE_DIGEST\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Install cluster-compatible kubectl
+        if: ${{ inputs.deploy }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          CLUSTER_VERSION="$(aws eks describe-cluster \
+            --name "$EKS_CLUSTER_NAME" \
+            --region "$AWS_REGION" \
+            --query 'cluster.version' \
+            --output text \
+            --no-cli-pager)"
+
+          KUBECTL_VERSION="$(curl --fail --silent --show-error --location \
+            "https://dl.k8s.io/release/stable-${CLUSTER_VERSION}.txt")"
+
+          DOWNLOAD_DIR="$(mktemp -d)"
+          cd "$DOWNLOAD_DIR"
+
+          curl --fail --silent --show-error --location \
+            --output kubectl \
+            "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+
+          curl --fail --silent --show-error --location \
+            --output kubectl.sha256 \
+            "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl.sha256"
+
+          echo "$(cat kubectl.sha256)  kubectl" | sha256sum --check
+          sudo install -m 0755 kubectl /usr/local/bin/kubectl
+
+          kubectl version --client
+
+      - name: Configure kubeconfig
+        if: ${{ inputs.deploy }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          aws eks update-kubeconfig \
+            --name "$EKS_CLUSTER_NAME" \
+            --region "$AWS_REGION" \
+            --alias shopsphere-ci
+
+      - name: Record previous image
+        if: ${{ inputs.deploy }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          PREVIOUS_IMAGE="$(kubectl get deployment product-service \
+            --namespace shopsphere \
+            -o jsonpath='{.spec.template.spec.containers[?(@.name=="product-service")].image}')"
+
+          test -n "$PREVIOUS_IMAGE"
+
+          echo "Previous image: $PREVIOUS_IMAGE"
+          echo "- Previous image: \`$PREVIOUS_IMAGE\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Deploy image by digest and wait for rollout
+        if: ${{ inputs.deploy }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          kubectl set image deployment/product-service \
+            "product-service=$IMAGE_DIGEST" \
+            --namespace shopsphere
+
+          kubectl rollout status deployment/product-service \
+            --namespace shopsphere \
+            --timeout=300s
+
+          kubectl get deployment product-service \
+            --namespace shopsphere \
+            -o wide
+
+          echo "- Rollout: completed" >> "$GITHUB_STEP_SUMMARY"
