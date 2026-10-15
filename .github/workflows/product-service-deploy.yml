@@ -38,6 +38,17 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v4
 
+      - name: Set up Node.js for regression tests
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies and run regression tests
+        working-directory: services/product-service
+        run: |
+          npm ci
+          npm test
+
       - name: Define unique image tag
         shell: bash
         run: |
