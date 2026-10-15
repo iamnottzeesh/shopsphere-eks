@@ -36,12 +36,13 @@ jobs:
 
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Node.js for regression tests
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '22'
+          package-manager-cache: false
 
       - name: Install dependencies and run regression tests
         working-directory: services/product-service
@@ -356,7 +357,7 @@ jobs:
 
     steps:
       - name: Checkout main for release recording
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: main
 
