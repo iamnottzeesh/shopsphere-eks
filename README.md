@@ -195,7 +195,7 @@ Ensure the manifest image is the intended release before reapplying it.
 - AWS Secrets Manager integration.
 - Cart, order, and authentication services.
 - Database integration.
-- Review action runtimes in the separate OIDC-check workflow; validate the updated release-recording checkout on the next actual release.
+- Validate the updated release-recording checkout on the next actual release.
 
 Validation limitations are documented in the linked evidence.
 Current implemented business-service scope is product-service.

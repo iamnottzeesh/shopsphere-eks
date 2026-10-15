@@ -76,3 +76,7 @@ The shared run summary listed no Node.js 20 warning.
 The release-recording job was skipped in this build-only validation;
 its updated checkout remains to be exercised on the next actual release.
 The separate AWS OIDC-check workflow was not changed.
+
+OIDC workflow inspection on 2026-10-15 found no checkout/setup-node
+references. Its only action reference was configure-aws-credentials@v6.3.0.
+No OIDC workflow changes or additional execution were needed for this review.
