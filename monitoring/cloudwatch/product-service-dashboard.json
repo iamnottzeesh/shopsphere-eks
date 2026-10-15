@@ -1,0 +1,98 @@
+{
+  "start": "-PT3H",
+  "periodOverride": "inherit",
+  "widgets": [
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 0,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "title": "Memory utilization over pod limit (%)",
+        "region": "ap-south-1",
+        "view": "timeSeries",
+        "period": 60,
+        "stat": "Maximum",
+        "metrics": [
+          [
+            "ContainerInsights",
+            "pod_memory_utilization_over_pod_limit",
+            "ClusterName",
+            "shopsphere-eks",
+            "PodName",
+            "product-service",
+            "Namespace",
+            "shopsphere"
+          ]
+        ],
+        "annotations": {
+          "horizontal": [
+            {
+              "label": "Alarm threshold",
+              "value": 80
+            }
+          ]
+        },
+        "yAxis": {
+          "left": {
+            "min": 0
+          }
+        }
+      }
+    },
+    {
+      "type": "metric",
+      "x": 12,
+      "y": 0,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "title": "Running pods (not readiness)",
+        "region": "ap-south-1",
+        "view": "timeSeries",
+        "period": 60,
+        "stat": "Minimum",
+        "metrics": [
+          [
+            "ContainerInsights",
+            "service_number_of_running_pods",
+            "ClusterName",
+            "shopsphere-eks",
+            "Service",
+            "product-service",
+            "Namespace",
+            "shopsphere"
+          ]
+        ],
+        "annotations": {
+          "horizontal": [
+            {
+              "label": "Alarm threshold",
+              "value": 2
+            }
+          ]
+        },
+        "yAxis": {
+          "left": {
+            "min": 0
+          }
+        }
+      }
+    },
+    {
+      "type": "alarm",
+      "x": 0,
+      "y": 6,
+      "width": 24,
+      "height": 3,
+      "properties": {
+        "title": "Product-service alarm status",
+        "alarms": [
+          "arn:aws:cloudwatch:ap-south-1:121973526749:alarm:shopsphere-product-service-high-memory",
+          "arn:aws:cloudwatch:ap-south-1:121973526749:alarm:shopsphere-product-service-low-running-pods"
+        ]
+      }
+    }
+  ]
+}
