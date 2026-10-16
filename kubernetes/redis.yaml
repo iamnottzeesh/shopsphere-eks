@@ -50,6 +50,10 @@ spec:
             - "yes"
             - --appendfsync
             - everysec
+            - --maxmemory
+            - 128mb
+            - --maxmemory-policy
+            - noeviction
           ports:
             - name: redis
               containerPort: 6379
