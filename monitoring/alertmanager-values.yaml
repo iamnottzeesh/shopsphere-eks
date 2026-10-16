@@ -1,0 +1,39 @@
+alertmanager:
+  alertmanagerSpec:
+    secrets:
+      - alertmanager-smtp-secret
+
+  config:
+    global:
+      resolve_timeout: 5m
+      smtp_smarthost: "smtp.gmail.com:587"
+      smtp_from: "justzeeshan8824@gmail.com"
+      smtp_auth_username: "justzeeshan8824@gmail.com"
+      smtp_auth_password_file: "/etc/alertmanager/secrets/alertmanager-smtp-secret/password"
+      smtp_require_tls: true
+
+    route:
+      receiver: "shopsphere-email"
+      group_by: ["namespace", "alertname"]
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 4h
+      routes:
+        - receiver: "null"
+          matchers:
+            - alertname = "Watchdog"
+
+    receivers:
+      - name: "null"
+      - name: "shopsphere-email"
+        email_configs:
+          - to: "justzeeshan8824@gmail.com"
+            from: "justzeeshan8824@gmail.com"
+            smarthost: "smtp.gmail.com:587"
+            auth_username: "justzeeshan8824@gmail.com"
+            auth_identity: "justzeeshan8824@gmail.com"
+            auth_password_file: "/etc/alertmanager/secrets/alertmanager-smtp-secret/password"
+            send_resolved: true
+
+    templates:
+      - /etc/alertmanager/config/*.tmpl
