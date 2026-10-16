@@ -48,3 +48,5 @@ terraform/**/*.tfstate
 terraform/**/*.tfstate.*
 terraform/**/tfplan
 terraform/**/tfplan.*
+shopsphere-oidc-trust-*.json
+product-service-before-instrumentation-optout.yaml
