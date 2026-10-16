@@ -11,3 +11,4 @@ data:
   APP_ENV: "production"
   PRODUCT_SERVICE_URL: "http://product-service.shopsphere.svc.cluster.local"
   PRODUCT_TIMEOUT_MS: "2000"
+  REDIS_URL: "redis://redis.shopsphere.svc.cluster.local:6379"

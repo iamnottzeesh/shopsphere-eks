@@ -26,7 +26,7 @@ spec:
     spec:
       containers:
         - name: cart-service
-          image: 121973526749.dkr.ecr.ap-south-1.amazonaws.com/shopsphere/cart-service@sha256:ac0dad97ae8b632a5f497d03b0e9f092b71975ef688efac1cd00bdf1e8b2ab64
+          image: 121973526749.dkr.ecr.ap-south-1.amazonaws.com/shopsphere/cart-service@sha256:18868d419a8b37ffa93fee80633e44ef4bb1a1bc797d584d1d138842efdf330b
           imagePullPolicy: IfNotPresent
           envFrom:
             - configMapRef:

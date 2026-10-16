@@ -1,39 +1,39 @@
 const { createProductClient } = require("./product-client");
+const { createCartStore } = require("./cart-store");
 const express = require("express");
 const { randomUUID } = require("node:crypto");
 
-function createCartRouter({ getProduct = createProductClient() } = {}) {
+function createCartRouter({
+  getProduct = createProductClient(),
+  store = createCartStore()
+} = {}) {
   const router = express.Router();
-  const carts = new Map();
 
-  router.post("/", (req, res) => {
-    if (carts.size >= 1000) {
-      return res.status(503).json({ error: "Demo cart capacity reached" });
+  router.post("/", async (req, res, next) => {
+    try {
+      const cart = await store.create();
+      return res.status(201).json(cart);
+    } catch (error) {
+      return next(error);
     }
-
-    const cart = {
-      id: randomUUID(),
-      currency: "INR",
-      items: [],
-      total: 0
-    };
-    carts.set(cart.id, cart);
-    return res.status(201).json(cart);
   });
 
-  router.param("cartId", (req, res, next, cartId) => {
-    const cart = carts.get(cartId);
-    if (!cart) {
-      return res.status(404).json({ error: "Cart not found" });
+  router.param("cartId", async (req, res, next, cartId) => {
+    try {
+      const cart = await store.get(cartId);
+      if (!cart) {
+        return res.status(404).json({ error: "Cart not found" });
+      }
+      req.cart = cart;
+      return next();
+    } catch (error) {
+      return next(error);
     }
-    req.cart = cart;
-    next();
   });
 
   router.get("/:cartId", (req, res) => {
     res.json(req.cart);
   });
-
 
   function recalculate(cart) {
     cart.total = cart.items.reduce(
@@ -66,26 +66,35 @@ function createCartRouter({ getProduct = createProductClient() } = {}) {
         unitPrice: product.price,
         quantity
       };
-      const total = [...items, item].reduce(
-        (sum, entry) => sum + entry.unitPrice * entry.quantity, 0
-      );
-      if (!Number.isSafeInteger(total)) {
+      const cart = {
+        ...req.cart,
+        items: [...items, item]
+      };
+      recalculate(cart);
+      if (!Number.isSafeInteger(cart.total)) {
         return res.status(422).json({ error: "Cart total exceeds supported range" });
       }
-      req.cart.items = [...items, item];
-      recalculate(req.cart);
-      return res.json(req.cart);
+      const saved = await store.save(cart);
+      return res.json(saved);
     } catch (error) {
-      next(error);
+      return next(error);
     }
   });
 
-  router.delete("/:cartId/items/:productId", (req, res) => {
-    req.cart.items = req.cart.items.filter(
-      item => item.productId !== req.params.productId
-    );
-    recalculate(req.cart);
-    res.json(req.cart);
+  router.delete("/:cartId/items/:productId", async (req, res, next) => {
+    try {
+      const cart = {
+        ...req.cart,
+        items: req.cart.items.filter(
+          item => item.productId !== req.params.productId
+        )
+      };
+      recalculate(cart);
+      const saved = await store.save(cart);
+      return res.json(saved);
+    } catch (error) {
+      return next(error);
+    }
   });
 
   return router;
