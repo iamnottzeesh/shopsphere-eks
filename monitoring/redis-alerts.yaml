@@ -1,0 +1,50 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: shopsphere-redis-alerts
+  namespace: monitoring
+  labels:
+    release: monitoring
+spec:
+  groups:
+    - name: shopsphere.redis
+      rules:
+        - alert: RedisUnavailable
+          expr: redis_up{namespace="monitoring",job="redis-exporter-prometheus-redis-exporter"} == 0
+          for: 2m
+          labels:
+            severity: critical
+            application: shopsphere
+          annotations:
+            summary: "ShopSphere Redis is unreachable"
+            description: "Redis exporter cannot connect to Redis. Check the Redis pod, Service endpoints and exporter logs."
+
+        - alert: RedisExporterUnavailable
+          expr: |
+            up{namespace="monitoring",job="redis-exporter-prometheus-redis-exporter"} == 0
+            or
+            absent(up{namespace="monitoring",job="redis-exporter-prometheus-redis-exporter"})
+          for: 2m
+          labels:
+            severity: critical
+            application: shopsphere
+          annotations:
+            summary: "ShopSphere Redis exporter monitoring is unavailable"
+            description: "The exporter target is failing scrapes or is missing. Check exporter pods, ServiceMonitor and Prometheus targets."
+
+        - alert: RedisMemoryHigh
+          expr: |
+            (
+              redis_memory_used_bytes{namespace="monitoring",job="redis-exporter-prometheus-redis-exporter"}
+              /
+              redis_memory_max_bytes{namespace="monitoring",job="redis-exporter-prometheus-redis-exporter"}
+            ) > 0.8
+            and
+            redis_memory_max_bytes{namespace="monitoring",job="redis-exporter-prometheus-redis-exporter"} > 0
+          for: 5m
+          labels:
+            severity: warning
+            application: shopsphere
+          annotations:
+            summary: "ShopSphere Redis memory budget exceeds 80%"
+            description: "Redis memory usage is above 80% of maxmemory. With noeviction configured, memory-increasing writes may fail when the budget is exhausted."
