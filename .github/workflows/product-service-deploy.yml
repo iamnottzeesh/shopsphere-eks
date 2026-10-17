@@ -352,6 +352,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+      actions: write
     env:
       RELEASE_IMAGE: ${{ needs.build-and-deploy.outputs.image_digest }}
 
@@ -441,3 +442,10 @@ jobs:
             --body "$BODY")"
 
           echo "- Release-recording PR: $PR_URL" >> "$GITHUB_STEP_SUMMARY"
+
+          # Test the release PR head, not the deployment workflow's main ref.
+          gh workflow run service-tests.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref "$BRANCH"
+
+          echo "- Service tests requested on: $BRANCH" >> "$GITHUB_STEP_SUMMARY"
