@@ -1,0 +1,24 @@
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshot
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"snapshot.storage.k8s.io/v1","kind":"VolumeSnapshot","metadata":{"annotations":{},"name":"source-snapshot","namespace":"storage-test"},"spec":{"source":{"persistentVolumeClaimName":"snapshot-source"},"volumeSnapshotClassName":"shopsphere-ebs-snapshot-test"}}
+  creationTimestamp: "2026-10-17T12:49:07Z"
+  finalizers:
+  - snapshot.storage.kubernetes.io/volumesnapshot-as-source-protection
+  - snapshot.storage.kubernetes.io/volumesnapshot-bound-protection
+  generation: 1
+  name: source-snapshot
+  namespace: storage-test
+  resourceVersion: "2032655"
+  uid: 1a45b6a1-f9ff-4e5a-8efa-a7d30b2476a1
+spec:
+  source:
+    persistentVolumeClaimName: snapshot-source
+  volumeSnapshotClassName: shopsphere-ebs-snapshot-test
+status:
+  boundVolumeSnapshotContentName: snapcontent-1a45b6a1-f9ff-4e5a-8efa-a7d30b2476a1
+  creationTime: "2026-10-17T12:49:08Z"
+  readyToUse: true
+  restoreSize: 1Gi

@@ -1,0 +1,3 @@
+PV                                         VOLUME                  RECLAIM
+pvc-c6f5261b-8232-480a-953e-02be0a4d5b4e   vol-0f8c7c2c41f79270c   Retain
+pvc-8b138ffb-ef63-448c-afa6-2506f482b03d   vol-0168f7beb4380ef87   Retain

@@ -1,0 +1,29 @@
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshotContent
+metadata:
+  creationTimestamp: "2026-10-17T12:49:07Z"
+  finalizers:
+  - snapshot.storage.kubernetes.io/volumesnapshotcontent-bound-protection
+  generation: 1
+  name: snapcontent-1a45b6a1-f9ff-4e5a-8efa-a7d30b2476a1
+  resourceVersion: "2032389"
+  uid: 2dfdec10-4108-41af-b8a8-e051b1baa4c7
+spec:
+  deletionPolicy: Delete
+  driver: ebs.csi.aws.com
+  source:
+    volumeHandle: vol-0f8c7c2c41f79270c
+  sourceVolumeMode: Filesystem
+  volumeSnapshotClassName: shopsphere-ebs-snapshot-test
+  volumeSnapshotRef:
+    apiVersion: snapshot.storage.k8s.io/v1
+    kind: VolumeSnapshot
+    name: source-snapshot
+    namespace: storage-test
+    resourceVersion: "2032218"
+    uid: 1a45b6a1-f9ff-4e5a-8efa-a7d30b2476a1
+status:
+  creationTime: 1792241348571000000
+  readyToUse: true
+  restoreSize: 1073741824
+  snapshotHandle: snap-0c81bd654345ec3ec
