@@ -48,9 +48,20 @@ to EKS. The existing product release workflow remains manual.
 
 Documentation-only changes do not require an application release.
 
-## Known automation limitation
+## Release-recording PR checks
 
-Release-recording PRs created with GITHUB_TOKEN may not trigger
-the pull_request workflow automatically. Required-check handling
-for those bot-created PRs must be resolved without disabling
-branch protection.
+The release-recording job explicitly dispatches service-tests.yml
+on the release branch after creating its pull request.
+
+Only that job receives actions: write permission.
+The service-test workflow retains contents: read permission.
+
+A successful dispatch request does not mean tests have passed.
+Verify both required checks on the recording PR's current head
+before merging, and compare the proposed digest with live EKS.
+
+If GitHub also presents approval-required PR-triggered runs,
+inspect the run events and commit SHAs rather than assuming that
+dispatch completed every pending run.
+
+End-to-end validation of the new bot-PR dispatch path is pending.
