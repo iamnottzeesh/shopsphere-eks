@@ -31,6 +31,11 @@ function renderProducts(products) {
         <span class="price">${formatPrice(product.price, product.currency)}</span>
         <span class="stock">${product.stock} in stock</span>
       </div>
+      <button type="button" class="cart-action"
+        data-add-product="${encodeURIComponent(product.id)}"
+        ${product.stock < 1 ? "disabled" : ""}>
+        ${product.stock < 1 ? "Out of stock" : "Add to cart"}
+      </button>
     </article>
   `).join("");
 }
