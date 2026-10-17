@@ -31,7 +31,7 @@ spec:
     spec:
       containers:
         - name: product-service
-          image: 121973526749.dkr.ecr.ap-south-1.amazonaws.com/shopsphere-product-service@sha256:ebabe7169ed50e844a3fc7b5f783a7bace8f440d3fa24c27f079e5dd2756c78b
+          image: 121973526749.dkr.ecr.ap-south-1.amazonaws.com/shopsphere-product-service@sha256:99094673f714d53b63ad39c480a1682f32b53c1b27563a9310b6d2e3b90a1c98
           imagePullPolicy: IfNotPresent
           envFrom:
             - configMapRef:
