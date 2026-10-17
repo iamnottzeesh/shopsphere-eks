@@ -1,0 +1,71 @@
+name: Validate Bot PR Test Dispatch
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v5
+        with:
+          ref: main
+
+      - name: Create temporary bot PR and dispatch tests
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          BRANCH="validation/bot-ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          FILE="docs/ci/dispatch-validation-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.txt"
+
+          git switch -c "$BRANCH"
+          mkdir -p docs/ci
+
+          printf 'Temporary bot PR dispatch validation.\nRun: %s\n' \
+            "$GITHUB_RUN_ID" > "$FILE"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add -- "$FILE"
+          git commit -m "test: temporary bot PR dispatch validation"
+
+          HEAD_SHA="$(git rev-parse HEAD)"
+          git push origin "HEAD:refs/heads/$BRANCH"
+
+          PR_URL="$(gh pr create \
+            --repo "$GITHUB_REPOSITORY" \
+            --base main \
+            --head "$BRANCH" \
+            --title "test: temporary bot PR dispatch validation" \
+            --body "Validation only. Do not merge. Verify dispatched service checks on this PR head, then close the PR and delete its branch.")"
+
+          {
+            echo "## Bot PR dispatch validation"
+            echo "- PR: $PR_URL"
+            echo "- Branch: $BRANCH"
+            echo "- Expected test head SHA: $HEAD_SHA"
+            echo "- Cleanup: close this PR without merging, then delete its branch."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          gh workflow run service-tests.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref "$BRANCH"
+
+          echo "- Dispatch request accepted; test results still require verification." \
+            >> "$GITHUB_STEP_SUMMARY"
