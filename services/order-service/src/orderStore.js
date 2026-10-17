@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
+import { redis } from "./redis.js";
 
-const orders = new Map();
-
+const orderKeyPrefix = "orders:";
 const allowedTransitions = {
   created: ["paid"],
   paid: ["shipped"],
@@ -9,7 +9,11 @@ const allowedTransitions = {
   delivered: []
 };
 
-export function createOrder(input) {
+function keyFor(id) {
+  return `${orderKeyPrefix}${id}`;
+}
+
+export async function createOrder(input) {
   const order = {
     id: randomUUID(),
     customerId: input.customerId,
@@ -19,16 +23,17 @@ export function createOrder(input) {
     updatedAt: new Date().toISOString()
   };
 
-  orders.set(order.id, order);
+  await redis.set(keyFor(order.id), JSON.stringify(order));
   return order;
 }
 
-export function getOrder(id) {
-  return orders.get(id) ?? null;
+export async function getOrder(id) {
+  const raw = await redis.get(keyFor(id));
+  return raw ? JSON.parse(raw) : null;
 }
 
-export function updateOrderStatus(id, nextStatus) {
-  const order = orders.get(id);
+export async function updateOrderStatus(id, nextStatus) {
+  const order = await getOrder(id);
 
   if (!order) {
     return { error: "not_found" };
@@ -37,16 +42,23 @@ export function updateOrderStatus(id, nextStatus) {
   const allowed = allowedTransitions[order.status] ?? [];
 
   if (!allowed.includes(nextStatus)) {
-    return { error: "invalid_transition", currentStatus: order.status };
+    return {
+      error: "invalid_transition",
+      currentStatus: order.status
+    };
   }
 
   order.status = nextStatus;
   order.updatedAt = new Date().toISOString();
-  orders.set(order.id, order);
 
+  await redis.set(keyFor(order.id), JSON.stringify(order));
   return { order };
 }
 
-export function resetOrders() {
-  orders.clear();
+export async function resetOrders() {
+  const keys = await redis.keys(`${orderKeyPrefix}*`);
+
+  if (keys.length > 0) {
+    await redis.del(...keys);
+  }
 }
