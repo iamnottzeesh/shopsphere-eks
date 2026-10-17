@@ -28,7 +28,7 @@ jobs:
         service:
           - product-service
           - cart-service
-
+          - order-service
     services:
       redis:
         image: redis:7.4-alpine
