@@ -62,6 +62,22 @@
 
       <div id="product-grid" class="product-grid" aria-live="polite"></div>
     </section>
+
+    <section id="shopping-cart" class="catalog-section cart-section"
+      aria-labelledby="cart-heading">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow dark">YOUR CART</p>
+          <h2 id="cart-heading">Shopping cart</h2>
+          <p>Demo cart — checkout and payments are not enabled.</p>
+        </div>
+        <button id="cart-refresh" type="button" class="filter">Refresh cart</button>
+      </div>
+      <p id="cart-message" role="status" aria-live="polite"></p>
+      <div id="cart-items"></div>
+      <p id="cart-total" class="cart-total">Total: ₹0.00</p>
+    </section>
+
   </main>
 
   <footer>
@@ -69,5 +85,6 @@
   </footer>
 
   <script src="/app.js"></script>
+  <script src="/cart-ui.js"></script>
 </body>
 </html>
