@@ -1,0 +1,7 @@
+NAME                    READY   STATUS    RESTARTS   AGE     IP            NODE                                        NOMINATED NODE   READINESS GATES
+pod/snapshot-restored   1/1     Running   0          3m25s   10.0.12.27    ip-10-0-12-35.ap-south-1.compute.internal   <none>           <none>
+pod/snapshot-source     1/1     Running   0          6m56s   10.0.12.186   ip-10-0-12-35.ap-south-1.compute.internal   <none>           <none>
+
+NAME                                      STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE     VOLUMEMODE
+persistentvolumeclaim/snapshot-restored   Bound    pvc-8b138ffb-ef63-448c-afa6-2506f482b03d   1Gi        RWO            gp3-csi        <unset>                 3m25s   Filesystem
+persistentvolumeclaim/snapshot-source     Bound    pvc-c6f5261b-8232-480a-953e-02be0a4d5b4e   1Gi        RWO            gp3-csi        <unset>                 6m56s   Filesystem

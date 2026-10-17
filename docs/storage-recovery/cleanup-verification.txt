@@ -1,0 +1,22 @@
+2026-10-17T13:01:47Z
+===== TEST EBS VOLUMES =====
+[]
+===== TEST EBS SNAPSHOT =====
+[]
+===== TEST NAMESPACE =====
+===== TEST SNAPSHOT CLASS =====
+===== APPLICATION =====
+NAME                              READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/cart-service      2/2     2            2           47h
+deployment.apps/product-service   2/2     2            2           6d8h
+deployment.apps/redis             1/1     1            1           25h
+
+NAME                               STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE
+persistentvolumeclaim/redis-data   Bound    pvc-0a0a569c-f433-497b-914f-33357bd94aa2   2Gi        RWO            gp2            <unset>                 25h
+===== MONITORING STORAGE =====
+NAME                                                                                                     STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE
+monitoring-grafana                                                                                       Bound    pvc-cd9b8856-5b93-43d7-8f32-c5338dad9cc8   2Gi        RWO            gp2            <unset>                 23h
+prometheus-monitoring-kube-prometheus-prometheus-db-prometheus-monitoring-kube-prometheus-prometheus-0   Bound    pvc-34021116-0da9-49cd-9de3-0ac0e195c7c6   10Gi       RWO            gp2            <unset>                 23h
+===== SHARED STORAGECLASS =====
+NAME      PROVISIONER       RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE
+gp3-csi   ebs.csi.aws.com   Retain          WaitForFirstConsumer   true                   21h

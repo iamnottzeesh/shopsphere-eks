@@ -1,0 +1,62 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: snapshot-restored
+  namespace: storage-test
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: gp3-csi
+  resources:
+    requests:
+      storage: 1Gi
+  dataSource:
+    name: source-snapshot
+    kind: VolumeSnapshot
+    apiGroup: snapshot.storage.k8s.io
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: snapshot-restored
+  namespace: storage-test
+spec:
+  restartPolicy: Never
+  containers:
+    - name: verifier
+      image: public.ecr.aws/docker/library/busybox:1.37
+      command:
+        - sh
+        - -c
+        - |
+          set -eu
+          cd /data
+          test -s recovery-proof.txt
+          test -s SHA256SUMS
+          sha256sum -c SHA256SUMS
+          cat recovery-proof.txt
+          sleep 86400
+      readinessProbe:
+        exec:
+          command:
+            - sh
+            - -c
+            - cd /data && sha256sum -c SHA256SUMS
+        initialDelaySeconds: 2
+        periodSeconds: 5
+      resources:
+        requests:
+          cpu: 10m
+          memory: 16Mi
+        limits:
+          cpu: 100m
+          memory: 64Mi
+      volumeMounts:
+        - name: restored-data
+          mountPath: /data
+          readOnly: true
+  volumes:
+    - name: restored-data
+      persistentVolumeClaim:
+        claimName: snapshot-restored
+        readOnly: true

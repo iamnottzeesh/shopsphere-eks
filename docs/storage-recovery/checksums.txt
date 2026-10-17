@@ -1,0 +1,6 @@
+===== snapshot-source =====
+/data/recovery-proof.txt: OK
+a3889de00cf702ca517830dba1d77f049a47d78c0e6816b9023a6729d31a2f4a  recovery-proof.txt
+===== snapshot-restored =====
+/data/recovery-proof.txt: OK
+a3889de00cf702ca517830dba1d77f049a47d78c0e6816b9023a6729d31a2f4a  recovery-proof.txt

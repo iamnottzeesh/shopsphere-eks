@@ -1,0 +1,66 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: storage-test
+  labels:
+    app.kubernetes.io/part-of: shopsphere-storage-test
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: snapshot-source
+  namespace: storage-test
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: gp3-csi
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: snapshot-source
+  namespace: storage-test
+spec:
+  restartPolicy: Never
+  containers:
+    - name: writer
+      image: public.ecr.aws/docker/library/busybox:1.37
+      command:
+        - sh
+        - -c
+        - |
+          set -eu
+          if [ ! -f /data/recovery-proof.txt ]; then
+            printf 'ShopSphere isolated storage recovery proof\n' \
+              > /data/recovery-proof.txt
+            sha256sum /data/recovery-proof.txt > /data/SHA256SUMS
+            sync
+          fi
+          cd /data
+          sha256sum -c SHA256SUMS
+          sleep 86400
+      readinessProbe:
+        exec:
+          command:
+            - sh
+            - -c
+            - cd /data && sha256sum -c SHA256SUMS
+        initialDelaySeconds: 2
+        periodSeconds: 5
+      resources:
+        requests:
+          cpu: 10m
+          memory: 16Mi
+        limits:
+          cpu: 100m
+          memory: 64Mi
+      volumeMounts:
+        - name: test-data
+          mountPath: /data
+  volumes:
+    - name: test-data
+      persistentVolumeClaim:
+        claimName: snapshot-source
