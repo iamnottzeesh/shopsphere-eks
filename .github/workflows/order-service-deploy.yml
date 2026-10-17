@@ -117,13 +117,15 @@ jobs:
           echo "Health check failed"
           exit 1
 
-      - name: Publish immutable image digest
+      - name: Push image and capture digest
         id: publish
         run: |
           TAG="${{ github.event.inputs.image_tag }}"
           IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY:$TAG"
 
-          DIGEST="$(docker buildx imagetools inspect "$IMAGE" --format '{{json .Manifest.Digest}}' | tr -d '"')"
+          docker push "$IMAGE"
+
+          DIGEST="$(docker image inspect --format '{{index .RepoDigests 0}}' "$IMAGE"             | sed 's|.*/||')"
           IMAGE_DIGEST="$ECR_REGISTRY/$ECR_REPOSITORY@$DIGEST"
 
           if [[ "$IMAGE_DIGEST" != "$ECR_REGISTRY/$ECR_REPOSITORY@sha256:"* ]]; then
