@@ -125,7 +125,8 @@ jobs:
 
           docker push "$IMAGE"
 
-          DIGEST="$(docker image inspect --format '{{index .RepoDigests 0}}' "$IMAGE"             | sed 's|.*/||')"
+          REPO_DIGEST="$(docker image inspect --format '{{index .RepoDigests 0}}' "$IMAGE")"
+          DIGEST="${REPO_DIGEST##*@}"
           IMAGE_DIGEST="$ECR_REGISTRY/$ECR_REPOSITORY@$DIGEST"
 
           if [[ "$IMAGE_DIGEST" != "$ECR_REGISTRY/$ECR_REPOSITORY@sha256:"* ]]; then
