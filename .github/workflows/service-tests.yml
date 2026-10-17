@@ -29,6 +29,7 @@ jobs:
           - product-service
           - cart-service
           - order-service
+
     services:
       redis:
         image: redis:7.4-alpine
@@ -61,6 +62,6 @@ jobs:
 
       - name: Run tests
         env:
-          TEST_REDIS_URL: ${{ matrix.service == 'cart-service' && 'redis://127.0.0.1:6379/0' || '' }}
-          REQUIRE_REDIS_TESTS: ${{ matrix.service == 'cart-service' && 'true' || 'false' }}
+          TEST_REDIS_URL: ${{ matrix.service == 'cart-service' && 'redis://127.0.0.1:6379/0' || matrix.service == 'order-service' && 'redis://127.0.0.1:6379/1' || '' }}
+          REQUIRE_REDIS_TESTS: ${{ matrix.service == 'cart-service' && 'true' || matrix.service == 'order-service' && 'true' || 'false' }}
         run: npm test

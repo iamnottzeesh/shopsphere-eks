@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
-import { after, before, describe, it } from "node:test";
+import { after, describe, it } from "node:test";
 import request from "supertest";
 import app from "../src/app.js";
+import { connectRedis, closeRedis } from "../src/redis.js";
 
 describe("GET /health", () => {
   it("returns service health", async () => {
@@ -12,5 +13,9 @@ describe("GET /health", () => {
       status: "ok",
       service: "order-service"
     });
+  });
+
+  after(async () => {
+    await closeRedis();
   });
 });
