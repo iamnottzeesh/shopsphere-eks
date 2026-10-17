@@ -2,10 +2,13 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const { createRedisStore } = require("../src/cart-store");
 
-test("Redis cart store persists across store instances", { timeout: 10000 }, async () => {
+test("Redis cart store persists across store instances", { timeout: 10000 }, async (t) => {
   const redisUrl = process.env.TEST_REDIS_URL;
   if (!redisUrl) {
-    console.log("TEST_REDIS_URL not set; skipping Redis store test");
+    if (process.env.REQUIRE_REDIS_TESTS === "true") {
+      assert.fail("TEST_REDIS_URL is required for Redis integration tests");
+    }
+    t.skip("TEST_REDIS_URL not set; Redis integration test not run");
     return;
   }
 
