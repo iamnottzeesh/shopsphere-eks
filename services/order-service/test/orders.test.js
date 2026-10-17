@@ -50,4 +50,43 @@ describe("order API", () => {
 
     assert.equal(response.status, 404);
   });
+
+  it("transitions a created order to paid", async () => {
+    const created = await request(app)
+      .post("/orders")
+      .send({
+        customerId: "customer-1",
+        items: [{ productId: "product-1", quantity: 1 }]
+      });
+
+    const response = await request(app)
+      .patch(`/orders/${created.body.id}/status`)
+      .send({ status: "paid" });
+
+    assert.equal(response.status, 200);
+    assert.equal(response.body.status, "paid");
+  });
+
+  it("rejects an invalid status transition", async () => {
+    const created = await request(app)
+      .post("/orders")
+      .send({
+        customerId: "customer-1",
+        items: [{ productId: "product-1", quantity: 1 }]
+      });
+
+    const response = await request(app)
+      .patch(`/orders/${created.body.id}/status`)
+      .send({ status: "delivered" });
+
+    assert.equal(response.status, 409);
+  });
+
+  it("returns 404 when updating an unknown order status", async () => {
+    const response = await request(app)
+      .patch("/orders/does-not-exist/status")
+      .send({ status: "paid" });
+
+    assert.equal(response.status, 404);
+  });
 });
