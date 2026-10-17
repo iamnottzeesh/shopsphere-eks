@@ -1,0 +1,202 @@
+name: Order Service Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Image tag to build and deploy"
+        required: false
+        default: "latest"
+
+permissions:
+  id-token: write
+  contents: write
+  packages: read
+
+concurrency:
+  group: shopsphere-order-service-release
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ap-south-1
+  ECR_REGISTRY: 121973526749.dkr.ecr.ap-south-1.amazonaws.com
+  ECR_REPOSITORY: shopsphere-order-service
+  K8S_DEPLOYMENT: order-service
+  K8S_CONTAINER: order-service
+  K8S_NAMESPACE: shopsphere
+  MANIFEST: kubernetes/order-service.yaml
+
+jobs:
+  build:
+    name: Build and publish image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    outputs:
+      image_digest: ${{ steps.publish.outputs.image_digest }}
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      - name: Install dependencies
+        working-directory: services/order-service
+        run: npm ci
+
+      - name: Run tests
+        working-directory: services/order-service
+        env:
+          TEST_REDIS_URL: redis://127.0.0.1:6379/1
+          REQUIRE_REDIS_TESTS: 'true'
+        run: npm test
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6.3.0
+        with:
+          role-to-assume: arn:aws:iam::121973526749:role/shopsphere-github-actions-role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        run: |
+          aws ecr get-login-password --region "$AWS_REGION" \
+            | docker login --username AWS \
+                --password-stdin "$ECR_REGISTRY"
+
+      - name: Build order-service image
+        working-directory: services/order-service
+        run: |
+          TAG="${{ github.event.inputs.image_tag }}"
+          IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY:$TAG"
+
+          docker build \
+            --file Dockerfile \
+            --tag "$IMAGE" \
+            .
+
+          docker image inspect "$IMAGE" >/dev/null
+
+      - name: Smoke test image
+        run: |
+          TAG="${{ github.event.inputs.image_tag }}"
+          IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY:$TAG"
+
+          docker run --rm -d --name order-service-smoke \
+            -p 8080:8080 \
+            -e ORDER_REDIS_URL=redis://172.17.0.1:6379/1 \
+            "$IMAGE"
+
+          trap 'docker logs order-service-smoke || true; docker rm --force order-service-smoke || true' EXIT
+
+          for attempt in {1..20}; do
+            if curl --fail --silent http://127.0.0.1:8080/health | grep -q '"status":"ok"'; then
+              echo "Health check passed"
+              exit 0
+            fi
+            sleep 1
+          done
+
+          echo "Health check failed"
+          exit 1
+
+      - name: Publish immutable image digest
+        id: publish
+        run: |
+          TAG="${{ github.event.inputs.image_tag }}"
+          IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY:$TAG"
+
+          DIGEST="$(docker buildx imagetools inspect "$IMAGE" --format '{{json .Manifest.Digest}}' | tr -d '"')"
+          IMAGE_DIGEST="$ECR_REGISTRY/$ECR_REPOSITORY@$DIGEST"
+
+          if [[ "$IMAGE_DIGEST" != "$ECR_REGISTRY/$ECR_REPOSITORY@sha256:"* ]]; then
+            echo "Invalid image digest: $IMAGE_DIGEST"
+            exit 1
+          fi
+
+          echo "image_digest=$IMAGE_DIGEST" >> "$GITHUB_OUTPUT"
+          echo "Published $IMAGE_DIGEST"
+
+  deploy:
+    name: Deploy to EKS
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    needs: build
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6.3.0
+        with:
+          role-to-assume: arn:aws:iam::121973526749:role/shopsphere-github-actions-role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Update Kubernetes manifest
+        run: |
+          IMAGE_DIGEST="${{ needs.build.outputs.image_digest }}"
+          sed -i "s|REPLACE_WITH_ORDER_SERVICE_IMAGE|$IMAGE_DIGEST|" "$MANIFEST"
+
+          grep -F "$IMAGE_DIGEST" "$MANIFEST"
+
+      - name: Deploy order-service
+        run: |
+          aws eks update-kubeconfig \
+            --name shopsphere-eks \
+            --region "$AWS_REGION"
+
+          kubectl apply -f "$MANIFEST"
+
+          kubectl -n "$K8S_NAMESPACE" rollout status \
+            deployment/"$K8S_DEPLOYMENT" \
+            --timeout=180s
+
+      - name: Verify deployment
+        run: |
+          aws eks update-kubeconfig \
+            --name shopsphere-eks \
+            --region "$AWS_REGION"
+
+          kubectl -n "$K8S_NAMESPACE" get deployment "$K8S_DEPLOYMENT"
+          kubectl -n "$K8S_NAMESPACE" get pods -l app="$K8S_DEPLOYMENT" -o wide
+
+          IMAGE="$(kubectl -n "$K8S_NAMESPACE" get deployment "$K8S_DEPLOYMENT" \
+            -o jsonpath='{.spec.template.spec.containers[?(@.name=="order-service")].image}')"
+
+          if [[ "$IMAGE" != "${{ needs.build.outputs.image_digest }}" ]]; then
+            echo "Deployment image mismatch: $IMAGE"
+            exit 1
+          fi
+
+      - name: Record verified release
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if git diff --quiet -- "$MANIFEST"; then
+            echo "No manifest changes to record"
+            exit 0
+          fi
+
+          BRANCH="release/order-service-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          git switch -c "$BRANCH"
+          git add "$MANIFEST"
+          git commit -m "chore: record verified order-service release"
+          git push origin "$BRANCH"
+
+          gh pr create \
+            --base main \
+            --head "$BRANCH" \
+            --title "chore: record order-service release $GITHUB_RUN_ID" \
+            --body "Records the verified order-service image digest deployed to EKS."
+        env:
+          GH_TOKEN: ${{ github.token }}
