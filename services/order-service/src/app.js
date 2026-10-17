@@ -1,5 +1,5 @@
 import express from "express";
-import { createOrder, getOrder } from "./orderStore.js";
+import { createOrder, getOrder, updateOrderStatus } from "./orderStore.js";
 
 const app = express();
 app.use(express.json());
@@ -50,6 +50,28 @@ app.get("/orders/:id", (req, res) => {
   }
 
   return res.status(200).json(order);
+});
+
+app.patch("/orders/:id/status", (req, res) => {
+  const { status } = req.body ?? {};
+
+  if (typeof status !== "string" || status.trim() === "") {
+    return res.status(400).json({ error: "status is required" });
+  }
+
+  const result = updateOrderStatus(req.params.id, status);
+
+  if (result.error === "not_found") {
+    return res.status(404).json({ error: "order not found" });
+  }
+
+  if (result.error === "invalid_transition") {
+    return res.status(409).json({
+      error: `cannot transition from ${result.currentStatus} to ${status}`
+    });
+  }
+
+  return res.status(200).json(result.order);
 });
 
 export default app;
